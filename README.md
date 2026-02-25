@@ -24,7 +24,7 @@ This is an advanced AI-powered PDF tool that allows you to:
     ```
 5.  Run the application:
     ```bash
-    streamlit run pdf_ai_tool.py
+    streamlit run app.py
     ```
 
 ## Requirements

@@ -9,7 +9,7 @@ The easiest and best way to deploy your **AI PDF Master** app is using **Streaml
 3.  **Select Repository**:
     *   **Repository**: Choose your new repository (e.g., `your-username/ai-pdf-master`).
     *   **Branch**: `main` (or `master`).
-    *   **Main file path**: Enter `pdf_ai_tool.py`.
+    *   **Main file path**: Enter `app.py`.
 4.  **Deploy**: Click "Deploy!".
 
 ## Environment Variables (Important for AI) 🔑
