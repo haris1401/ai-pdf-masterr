@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Console Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div id="app" class="container mx-auto p-6">
+        <header class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400">AI Console</h1>
+                <p class="text-gray-400">Multi-Agent Orchestration System</p>
+            </div>
+            <button @click="refreshData" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                <i class="fas fa-sync-alt mr-2"></i> Refresh
+            </button>
+        </header>
+
+        <!-- Agents Status -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div v-for="agent in agents" :key="agent.id" class="bg-gray-800 rounded-lg p-6 border-l-4" 
+                 :class="{'border-green-500': agent.status === 'idle', 'border-yellow-500': agent.status === 'busy', 'border-red-500': agent.status === 'error'}">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-xl font-semibold capitalize">{{ agent.name }}</h2>
+                    <span class="px-2 py-1 rounded text-xs uppercase font-bold"
+                          :class="{'bg-green-900 text-green-300': agent.status === 'idle', 'bg-yellow-900 text-yellow-300': agent.status === 'busy'}">
+                        {{ agent.status }}
+                    </span>
+                </div>
+                <div class="text-gray-400 text-sm mb-4">
+                    <p><i class="far fa-clock mr-2"></i> Last Active: {{ formatDate(agent.last_active) }}</p>
+                </div>
+                
+                <!-- Agent Specific Controls/Stats -->
+                <div class="mt-4 pt-4 border-t border-gray-700">
+                    <button @click="assignTask(agent.type)" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm">
+                        Assign Test Task
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Recent Tasks -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">Recent Activity</h2>
+                <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <div v-for="task in tasks" :key="task.id" class="bg-gray-700 rounded p-3 text-sm">
+                        <div class="flex justify-between mb-1">
+                            <span class="font-bold text-blue-300">{{ getAgentName(task.agent_id) }}</span>
+                            <span :class="getStatusColor(task.status)">{{ task.status }}</span>
+                        </div>
+                        <p class="text-gray-300 mb-1">{{ task.description }}</p>
+                        <p v-if="task.result" class="text-green-400 text-xs mt-1 bg-gray-900 p-2 rounded">
+                            <i class="fas fa-check mr-1"></i> {{ task.result }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">Performance Metrics</h2>
+                <div class="space-y-2 max-h-96 overflow-y-auto">
+                    <div v-for="metric in metrics" :key="metric.id" class="flex justify-between items-center bg-gray-700 p-2 rounded">
+                        <div>
+                            <span class="text-blue-300 font-medium">{{ getAgentName(metric.agent_id) }}</span>
+                            <span class="text-gray-400 text-xs ml-2">{{ metric.metric_name }}</span>
+                        </div>
+                        <span class="font-mono font-bold text-white">{{ metric.value }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
