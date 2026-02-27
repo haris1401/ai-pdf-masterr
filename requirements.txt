@@ -4,4 +4,3 @@ pymupdf
 openai
 python-dotenv
 pandas
-fitz
