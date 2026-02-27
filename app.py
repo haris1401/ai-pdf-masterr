@@ -6,8 +6,6 @@ import re
 import os
 import openai
 from dotenv import load_dotenv
-import speech_recognition as sr
-import threading
 
 # Load environment variables (for OpenAI key if present)
 load_dotenv()
@@ -16,8 +14,8 @@ if os.getenv("OPENAI_API_KEY"):
 
 st.set_page_config(page_title="AI PDF Master", page_icon="🤖", layout="wide")
 
-st.title("🤖 AI PDF Master: Voice-Controlled PDF Editor")
-st.markdown("Use your **voice** to edit PDFs. Say things like *'Replace 2023 with 2024'*.")
+st.title("🤖 AI PDF Master: Smart PDF Editor")
+st.markdown("Edit PDFs by simply **typing instructions**. E.g., *'Change the date to 2025'*, *'Replace John with Jane'*.")
 
 # --- Sidebar ---
 with st.sidebar:
@@ -43,10 +41,10 @@ if not uploaded_file:
 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
 
 # Tabs
-tab_voice, tab_replace, tab_extract, tab_ai = st.tabs(["🎙️ Voice Edit", "✏️ Manual Edit", "📊 Analyzer", "🤖 AI Chat"])
+tab_magic, tab_manual, tab_extract, tab_ai = st.tabs(["✨ Magic Edit", "✏️ Manual Edit", "📊 Analyzer", "🤖 AI Chat"])
 
-# Helper function to process voice command with LLM
-def parse_voice_command(command_text):
+# Helper function to process natural language command with LLM
+def parse_edit_command(command_text):
     """
     Uses OpenAI to extract 'find_text' and 'replace_text' from natural language.
     """
@@ -57,7 +55,7 @@ def parse_voice_command(command_text):
         response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a command parser. Extract the 'find' text and 'replace' text from the user's voice command. Return ONLY a JSON object: {\"find\": \"...\", \"replace\": \"...\"}. If the user says 'delete X', replace should be empty string."},
+                {"role": "system", "content": "You are a command parser. Extract the 'find' text and 'replace' text from the user's edit instruction. Return ONLY a JSON object: {\"find\": \"...\", \"replace\": \"...\"}. If the user says 'delete X', replace should be empty string. Example: 'Change 2023 to 2024' -> {\"find\": \"2023\", \"replace\": \"2024\"}"},
                 {"role": "user", "content": command_text}
             ]
         )
@@ -68,92 +66,72 @@ def parse_voice_command(command_text):
         return None, None, str(e)
 
 # ==========================================
-# TAB 1: VOICE EDITOR
+# TAB 1: MAGIC EDIT (Natural Language)
 # ==========================================
-with tab_voice:
-    st.header("🎙️ Voice Command Center")
-    st.write("Click the button and speak your edit command.")
-    st.info("Example: *'Change the date January 1st to February 1st'* or *'Replace Total Balance with Amount Due'*")
-
-    # Session state for voice result
-    if "voice_text" not in st.session_state:
-        st.session_state.voice_text = ""
+with tab_magic:
+    st.header("✨ Magic Editor")
+    st.write("Tell the AI what to change in the PDF.")
     
-    if st.button("🎤 Start Listening"):
-        r = sr.Recognizer()
-        with sr.Microphone() as source:
-            with st.spinner("Listening... Speak now!"):
-                try:
-                    audio = r.listen(source, timeout=5)
-                    st.session_state.voice_text = r.recognize_google(audio)
-                    st.success(f"Heard: \"{st.session_state.voice_text}\"")
-                except sr.UnknownValueError:
-                    st.error("Could not understand audio.")
-                except sr.RequestError as e:
-                    st.error(f"Could not request results; {e}")
-                except Exception as e:
-                    st.error(f"Microphone error: {e}. (Note: Microphone access may not work on deployed web apps due to browser security. Works best locally.)")
-
-    if st.session_state.voice_text:
-        st.write("---")
-        st.write(f"**Processing Command:** *{st.session_state.voice_text}*")
-        
-        find_val, replace_val, err = parse_voice_command(st.session_state.voice_text)
-        
-        if err:
-            st.error(f"AI Parsing Error: {err}")
-            st.warning("Fallback: Please enter values manually in the 'Manual Edit' tab.")
-        elif find_val is not None:
-            st.success(f"AI Detected -> Find: **'{find_val}'**, Replace with: **'{replace_val}'**")
+    edit_instruction = st.text_area("What should I change?", placeholder="e.g., Replace 'Invoice #001' with 'Invoice #999', or change 'Due Date: Jan 1' to 'Due Date: Feb 1'")
+    
+    if st.button("✨ Apply Magic Edit"):
+        if not edit_instruction:
+            st.error("Please type an instruction.")
+        else:
+            with st.spinner("AI is understanding your instruction..."):
+                find_val, replace_val, err = parse_edit_command(edit_instruction)
             
-            if st.button("Confirm & Apply Edit"):
-                 # Create a copy of the doc for editing
-                output_doc = fitz.open(stream=uploaded_file.getvalue(), filetype="pdf")
+            if err:
+                st.error(f"AI Error: {err}")
+                st.info("Try using the 'Manual Edit' tab instead.")
+            elif find_val is None:
+                st.warning("Could not understand what text to find. Please try rephrasing.")
+            else:
+                st.success(f"AI Plan: Find **'{find_val}'** -> Replace with **'{replace_val}'**")
                 
+                # Apply Edit
+                output_doc = fitz.open(stream=uploaded_file.getvalue(), filetype="pdf")
                 count = 0
+                
                 for page in output_doc:
-                    # Search for text
                     text_instances = page.search_for(find_val)
-                    
                     for rect in text_instances:
                         count += 1
-                        # 1. Redact (Remove) old text
-                        page.add_redact_annot(rect, fill=(1, 1, 1)) # Fill with white
+                        # 1. Redact (White out)
+                        page.add_redact_annot(rect, fill=(1, 1, 1))
                         page.apply_redactions()
                         
                         # 2. Insert new text
-                        # Heuristic to guess font size based on rect height
                         fontsize = rect.height * 0.8 
                         page.insert_text(
-                            point=rect.tl + (0, rect.height * 0.75), # Baseline adjustment
+                            point=rect.tl + (0, rect.height * 0.75),
                             text=replace_val,
                             fontsize=fontsize,
-                            color=(0, 0, 0) # Black text
+                            color=(0, 0, 0)
                         )
                 
                 if count > 0:
-                    st.success(f"Successfully replaced {count} occurrences!")
+                    st.success(f"✅ Successfully updated {count} places!")
                     
-                    # Save to buffer
                     output_buffer = io.BytesIO()
                     output_doc.save(output_buffer)
                     output_doc.close()
                     
                     st.download_button(
-                        label="Download Voice-Edited PDF",
+                        label="Download Edited PDF",
                         data=output_buffer.getvalue(),
-                        file_name="voice_edited_document.pdf",
+                        file_name="magic_edited_document.pdf",
                         mime="application/pdf"
                     )
                 else:
-                    st.warning(f"Could not find exact text '{find_val}' in the document.")
+                    st.warning(f"Could not find the text '{find_val}' in the document. Please check the spelling or try Manual Edit.")
 
 # ==========================================
 # TAB 2: MANUAL REPLACER
 # ==========================================
-with tab_replace:
+with tab_manual:
     st.header("Find & Replace Text")
-    st.markdown("Replace specific text in the PDF. Useful for updating dates, names, or values.")
+    st.markdown("Manually specify exact text to find and replace.")
     
     col1, col2 = st.columns(2)
     with col1:
